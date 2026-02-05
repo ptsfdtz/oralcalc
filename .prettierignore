@@ -1,0 +1,12 @@
+node_modules
+dist
+dist-ssr
+coverage
+.turbo
+.cache
+.vite
+*.log
+pnpm-lock.yaml
+src-tauri/target
+src-tauri/gen
+src-tauri/icons
