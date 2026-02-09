@@ -82,27 +82,36 @@ export function App() {
 
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium">Color theme</label>
-          <Select value={theme} onValueChange={handleThemeChange}>
-            <SelectTrigger className="w-64">
-              <SelectValue placeholder="Select a theme" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectLabel>Themes</SelectLabel>
-                {themes.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    <span
-                      className="inline-flex size-2.5 items-center justify-center rounded-full"
-                      style={{
-                        backgroundColor: `oklch(0.61 ${item.chroma ?? 0.11} ${item.hue})`,
-                      }}
-                    />
-                    <span>{item.label}</span>
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-wrap items-center gap-3">
+            <div
+              className="border-border bg-primary text-primary-foreground flex h-9 w-14 items-center justify-center rounded-lg border text-xs font-medium"
+              aria-label="Theme color preview"
+              title="Theme color preview"
+            >
+              Aa
+            </div>
+            <Select value={theme} onValueChange={handleThemeChange}>
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder="Select a theme" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Themes</SelectLabel>
+                  {themes.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      <span
+                        className="inline-flex size-2.5 items-center justify-center rounded-full"
+                        style={{
+                          backgroundColor: `oklch(0.61 ${item.chroma ?? 0.11} ${item.hue})`,
+                        }}
+                      />
+                      <span>{item.label}</span>
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
     </div>

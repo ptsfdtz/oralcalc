@@ -60,67 +60,190 @@
 }
 
 :root[data-theme='amber'] {
-  --theme-h: 85;
+  --primary-l: 0.67;
+  --primary-c: 0.16;
+  --theme-h: 58;
+  --chart-1: oklch(0.88 0.15 92);
+  --chart-2: oklch(0.77 0.16 70);
+  --chart-3: oklch(0.67 0.16 58);
+  --chart-4: oklch(0.56 0.15 49);
+  --chart-5: oklch(0.47 0.12 46);
 }
 
 :root[data-theme='blue'] {
-  --theme-h: 240;
+  --primary-l: 0.488;
+  --primary-c: 0.243;
+  --theme-h: 264.376;
+  --chart-1: oklch(0.809 0.105 251.813);
+  --chart-2: oklch(0.623 0.214 259.815);
+  --chart-3: oklch(0.546 0.245 262.881);
+  --chart-4: oklch(0.488 0.243 264.376);
+  --chart-5: oklch(0.424 0.199 265.638);
 }
 
 :root[data-theme='cyan'] {
-  --theme-h: 200;
+  --primary-l: 0.61;
+  --primary-c: 0.11;
+  --theme-h: 222;
+  --chart-1: oklch(0.87 0.12 207);
+  --chart-2: oklch(0.8 0.13 212);
+  --chart-3: oklch(0.71 0.13 215);
+  --chart-4: oklch(0.61 0.11 222);
+  --chart-5: oklch(0.52 0.09 223);
 }
 
 :root[data-theme='emerald'] {
-  --theme-h: 150;
+  --primary-l: 0.6;
+  --primary-c: 0.13;
+  --theme-h: 163;
+  --chart-1: oklch(0.85 0.13 165);
+  --chart-2: oklch(0.77 0.15 163);
+  --chart-3: oklch(0.7 0.15 162);
+  --chart-4: oklch(0.6 0.13 163);
+  --chart-5: oklch(0.51 0.1 166);
 }
 
 :root[data-theme='fuchsia'] {
-  --theme-h: 300;
+  --primary-l: 0.59;
+  --primary-c: 0.26;
+  --theme-h: 323;
+  --chart-1: oklch(0.83 0.13 321);
+  --chart-2: oklch(0.75 0.21 322);
+  --chart-3: oklch(0.67 0.26 322);
+  --chart-4: oklch(0.59 0.26 323);
+  --chart-5: oklch(0.52 0.23 324);
 }
 
 :root[data-theme='green'] {
-  --theme-h: 140;
+  --primary-l: 0.648;
+  --primary-c: 0.2;
+  --theme-h: 131.684;
+  --chart-1: oklch(0.871 0.15 154.449);
+  --chart-2: oklch(0.723 0.219 149.579);
+  --chart-3: oklch(0.627 0.194 149.214);
+  --chart-4: oklch(0.527 0.154 150.069);
+  --chart-5: oklch(0.448 0.119 151.328);
 }
 
 :root[data-theme='indigo'] {
-  --theme-h: 260;
+  --primary-l: 0.51;
+  --primary-c: 0.23;
+  --theme-h: 277;
+  --chart-1: oklch(0.79 0.1 275);
+  --chart-2: oklch(0.68 0.16 277);
+  --chart-3: oklch(0.59 0.2 277);
+  --chart-4: oklch(0.51 0.23 277);
+  --chart-5: oklch(0.46 0.21 277);
 }
 
 :root[data-theme='lime'] {
-  --theme-h: 110;
+  --primary-l: 0.65;
+  --primary-c: 0.18;
+  --theme-h: 132;
+  --chart-1: oklch(0.9 0.18 127);
+  --chart-2: oklch(0.85 0.21 129);
+  --chart-3: oklch(0.77 0.2 131);
+  --chart-4: oklch(0.65 0.18 132);
+  --chart-5: oklch(0.53 0.14 132);
 }
 
 :root[data-theme='orange'] {
-  --theme-h: 65;
+  --primary-l: 0.646;
+  --primary-c: 0.222;
+  --theme-h: 041.116;
+  --chart-1: oklch(0.837 0.128 66.29);
+  --chart-2: oklch(0.705 0.213 47.604);
+  --chart-3: oklch(0.646 0.222 41.116);
+  --chart-4: oklch(0.553 0.195 38.402);
+  --chart-5: oklch(0.47 0.157 37.304);
 }
 
 :root[data-theme='pink'] {
-  --theme-h: 330;
+  --primary-l: 0.59;
+  --primary-c: 0.22;
+  --theme-h: 1;
+  --chart-1: oklch(0.82 0.11 346);
+  --chart-2: oklch(0.73 0.18 350);
+  --chart-3: oklch(0.66 0.21 354);
+  --chart-4: oklch(0.59 0.22 1);
+  --chart-5: oklch(0.52 0.2 4);
+}
+
+:root[data-theme='purple'] {
+  --primary-l: 0.56;
+  --primary-c: 0.25;
+  --theme-h: 302;
+  --chart-1: oklch(0.83 0.11 306);
+  --chart-2: oklch(0.72 0.18 306);
+  --chart-3: oklch(0.63 0.23 304);
+  --chart-4: oklch(0.56 0.25 302);
+  --chart-5: oklch(0.5 0.24 302);
 }
 
 :root[data-theme='red'] {
-  --theme-h: 25;
+  --primary-l: 0.577;
+  --primary-c: 0.245;
+  --theme-h: 27.325;
+  --chart-1: oklch(0.808 0.114 19.571);
+  --chart-2: oklch(0.637 0.237 25.331);
+  --chart-3: oklch(0.577 0.245 27.325);
+  --chart-4: oklch(0.505 0.213 27.518);
+  --chart-5: oklch(0.444 0.177 26.899);
 }
 
 :root[data-theme='rose'] {
-  --theme-h: 350;
+  --primary-l: 0.586;
+  --primary-c: 0.253;
+  --theme-h: 17.585;
+  --chart-1: oklch(0.81 0.117 11.638);
+  --chart-2: oklch(0.645 0.246 16.439);
+  --chart-3: oklch(0.586 0.253 17.585);
+  --chart-4: oklch(0.514 0.222 16.935);
+  --chart-5: oklch(0.455 0.188 13.697);
 }
 
 :root[data-theme='sky'] {
-  --theme-h: 210;
+  --primary-l: 0.59;
+  --primary-c: 0.14;
+  --theme-h: 242;
+  --chart-1: oklch(0.83 0.1 230);
+  --chart-2: oklch(0.75 0.14 233);
+  --chart-3: oklch(0.68 0.15 237);
+  --chart-4: oklch(0.59 0.14 242);
+  --chart-5: oklch(0.5 0.12 243);
 }
 
 :root[data-theme='teal'] {
-  --theme-h: 170;
+  --primary-l: 0.6;
+  --primary-c: 0.1;
+  --theme-h: 185;
+  --chart-1: oklch(0.85 0.13 181);
+  --chart-2: oklch(0.78 0.13 182);
+  --chart-3: oklch(0.7 0.12 183);
+  --chart-4: oklch(0.6 0.1 185);
+  --chart-5: oklch(0.51 0.09 186);
 }
 
 :root[data-theme='violet'] {
-  --theme-h: 280;
+  --primary-l: 0.541;
+  --primary-c: 0.281;
+  --theme-h: 293.009;
+  --chart-1: oklch(0.811 0.111 293.571);
+  --chart-2: oklch(0.606 0.25 292.717);
+  --chart-3: oklch(0.541 0.281 293.009);
+  --chart-4: oklch(0.491 0.27 292.581);
+  --chart-5: oklch(0.432 0.232 292.759);
 }
 
 :root[data-theme='yellow'] {
-  --theme-h: 95;
+  --primary-l: 0.852;
+  --primary-c: 0.199;
+  --theme-h: 91.936;
+  --chart-1: oklch(0.905 0.182 98.111);
+  --chart-2: oklch(0.795 0.184 86.047);
+  --chart-3: oklch(0.681 0.162 75.834);
+  --chart-4: oklch(0.554 0.135 66.442);
+  --chart-5: oklch(0.476 0.114 61.907);
 }
 
 .dark {
