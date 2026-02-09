@@ -4,8 +4,8 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Switch } from '@/components/ui/switch';
 import { FiMoon, FiSun } from 'react-icons/fi';
 
-const COLOR_SCHEME_STORAGE_KEY = 'koibito-color-scheme';
-const THEME_STORAGE_KEY = 'koibito-theme';
+const COLOR_SCHEME_STORAGE_KEY = 'oralcalc-color-scheme';
+const THEME_STORAGE_KEY = 'oralcalc-theme';
 
 const themes = [
   { value: 'neutral', label: 'Neutral', hue: 0, chroma: 0.02 },

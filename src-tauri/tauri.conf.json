@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "koibito",
+  "productName": "oralcalc",
   "version": "0.1.0",
   "identifier": "ptsfdtz",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "koibito",
+        "title": "oralcalc",
         "width": 800,
         "height": 600
       }
