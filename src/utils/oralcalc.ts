@@ -5,6 +5,7 @@ import type {
   DocumentOptions,
   GenerateProblemsResult,
   GeneratorConfig,
+  OperandCount,
   OperatorKey,
   OperatorOption,
   OperatorState,
@@ -16,7 +17,6 @@ import type {
 export const COLOR_SCHEME_STORAGE_KEY = 'oralcalc-color-scheme';
 export const COLOR_THEME_STORAGE_KEY = 'oralcalc-color-theme';
 export const GENERATOR_CONFIG_STORAGE_KEY = 'oralcalc-generator-config';
-export const SHOW_ANSWERS_PREVIEW_STORAGE_KEY = 'oralcalc-show-answers-preview';
 
 export const COLOR_THEME_OPTIONS: ColorThemeOption[] = [
   { key: 'neutral', label: '中性灰' },
@@ -46,15 +46,20 @@ export const OPERATOR_OPTIONS: OperatorOption[] = [
   { key: 'div', label: '除法', symbol: '÷' },
 ];
 
+export const OPERAND_COUNT_OPTIONS: { key: OperandCount; label: string }[] = [
+  { key: 2, label: '两个数' },
+  { key: 3, label: '三个数' },
+  { key: 'mixed', label: '两个数 + 三个数混合' },
+];
+
 export const INITIAL_CONFIG: GeneratorConfig = {
-  worksheetTitle: '小学口算练习',
   count: 50,
   min: 0,
   max: 20,
-  columns: 4,
+  operandCount: 2,
+  showAnswerWithRandomBlankOperand: false,
   allowNegativeSubtraction: false,
   divisionIntegerOnly: true,
-  showAnswersInExport: true,
   operators: {
     add: true,
     sub: true,
@@ -117,12 +122,12 @@ function normalizeBoolean(value: unknown, fallback: boolean): boolean {
   return value;
 }
 
-function normalizeString(value: unknown, fallback: string): string {
-  if (typeof value !== 'string') {
-    return fallback;
+function normalizeOperandCount(value: unknown, fallback: OperandCount): OperandCount {
+  if (value === 2 || value === 3 || value === 'mixed') {
+    return value;
   }
 
-  return value;
+  return fallback;
 }
 
 export function loadConfigFromStorage(): GeneratorConfig {
@@ -141,14 +146,16 @@ export function loadConfigFromStorage(): GeneratorConfig {
   const storedOperators = storedConfig.operators;
 
   return {
-    worksheetTitle: normalizeString(storedConfig.worksheetTitle, INITIAL_CONFIG.worksheetTitle),
     count: normalizeInteger(storedConfig.count, INITIAL_CONFIG.count),
     min: normalizeInteger(storedConfig.min, INITIAL_CONFIG.min),
     max: normalizeInteger(storedConfig.max, INITIAL_CONFIG.max),
-    columns: normalizeInteger(storedConfig.columns, INITIAL_CONFIG.columns),
+    operandCount: normalizeOperandCount(storedConfig.operandCount, INITIAL_CONFIG.operandCount),
+    showAnswerWithRandomBlankOperand: normalizeBoolean(
+      storedConfig.showAnswerWithRandomBlankOperand,
+      INITIAL_CONFIG.showAnswerWithRandomBlankOperand,
+    ),
     allowNegativeSubtraction: normalizeBoolean(storedConfig.allowNegativeSubtraction, INITIAL_CONFIG.allowNegativeSubtraction),
     divisionIntegerOnly: normalizeBoolean(storedConfig.divisionIntegerOnly, INITIAL_CONFIG.divisionIntegerOnly),
-    showAnswersInExport: normalizeBoolean(storedConfig.showAnswersInExport, INITIAL_CONFIG.showAnswersInExport),
     operators: {
       add: normalizeBoolean(storedOperators?.add, INITIAL_CONFIG.operators.add),
       sub: normalizeBoolean(storedOperators?.sub, INITIAL_CONFIG.operators.sub),
@@ -156,16 +163,6 @@ export function loadConfigFromStorage(): GeneratorConfig {
       div: normalizeBoolean(storedOperators?.div, INITIAL_CONFIG.operators.div),
     },
   };
-}
-
-export function loadShowAnswersPreviewFromStorage(): boolean {
-  const storedValue = parseStoredJson(SHOW_ANSWERS_PREVIEW_STORAGE_KEY);
-
-  if (typeof storedValue !== 'boolean') {
-    return false;
-  }
-
-  return storedValue;
 }
 
 function randomInt(min: number, max: number): number {
@@ -207,10 +204,22 @@ function formatAnswer(value: number): string {
   return value.toFixed(2).replace(/\.?0+$/, '');
 }
 
+function formatOperand(value: number): string {
+  return formatAnswer(value);
+}
+
 export function formatProblem(problem: Problem, withAnswer = false): string {
-  const symbol = OPERATOR_OPTIONS.find((option) => option.key === problem.operator)?.symbol ?? '?';
+  const symbols = problem.operators.map((operator) => OPERATOR_OPTIONS.find((option) => option.key === operator)?.symbol ?? '?');
   const result = withAnswer ? formatAnswer(problem.answer) : '____';
-  return `${problem.index}. ${problem.left} ${symbol} ${problem.right} = ${result}`;
+
+  let expression = problem.blankOperandIndex === 0 ? '____' : formatOperand(problem.operands[0] ?? 0);
+  for (let index = 1; index < problem.operands.length; index += 1) {
+    const symbol = symbols[index - 1] ?? '?';
+    const operandText = problem.blankOperandIndex === index ? '____' : formatOperand(problem.operands[index]);
+    expression += ` ${symbol} ${operandText}`;
+  }
+
+  return `${problem.index}. ${expression} = ${result}`;
 }
 
 export function getWorksheetTypography(columns: number): WorksheetTypography {
@@ -235,57 +244,91 @@ export function getWorksheetTypography(columns: number): WorksheetTypography {
   return { fontSize: 13, lineHeight: 1.35, paddingY: 4, paddingX: 3 };
 }
 
-function buildProblemSeed(operator: OperatorKey, config: GeneratorConfig): ProblemSeed | null {
-  if (config.min > config.max) {
-    return null;
+type FixedOperandCount = 2 | 3;
+
+function resolveOperandCount(operandCount: OperandCount): FixedOperandCount {
+  if (operandCount === 'mixed') {
+    return Math.random() < 0.5 ? 2 : 3;
   }
 
-  if (operator === 'add') {
-    const minSum = config.min * 2;
-    if (minSum > config.max) {
-      return null;
-    }
+  return operandCount;
+}
 
-    const answer = randomInt(minSum, config.max);
-    const left = randomInt(config.min, answer - config.min);
-    const right = answer - left;
-    return { left, right, operator, answer };
+function pickOperatorSequence(enabledOperators: OperatorKey[], slots: number): OperatorKey[] {
+  if (slots <= 0) {
+    return [];
+  }
+
+  return Array.from({ length: slots }, () => enabledOperators[randomInt(0, enabledOperators.length - 1)]);
+}
+
+function applyOperator(left: number, right: number, operator: OperatorKey, divisionIntegerOnly: boolean): number | null {
+  if (operator === 'add') {
+    return left + right;
   }
 
   if (operator === 'sub') {
-    let left = randomInt(config.min, config.max);
-    let right = randomInt(config.min, config.max);
-
-    if (!config.allowNegativeSubtraction && right > left) {
-      [left, right] = [right, left];
-    }
-
-    return { left, right, operator, answer: left - right };
+    return left - right;
   }
 
   if (operator === 'mul') {
-    if (config.min === 0) {
-      const left = randomInt(config.min, config.max);
-      const rightMax = left === 0 ? config.max : Math.floor(config.max / left);
-      const right = randomInt(config.min, Math.min(config.max, rightMax));
-      return { left, right, operator, answer: left * right };
-    }
+    return left * right;
+  }
 
-    if (config.min * config.min > config.max) {
+  if (right === 0) {
+    return null;
+  }
+
+  const quotient = left / right;
+  if (!Number.isFinite(quotient)) {
+    return null;
+  }
+
+  if (divisionIntegerOnly) {
+    return Number.isInteger(quotient) ? quotient : null;
+  }
+
+  return Number(quotient.toFixed(2));
+}
+
+function pickNextOperand(currentValue: number, operator: OperatorKey, config: GeneratorConfig): number | null {
+  if (operator === 'add') {
+    const maxOperand = Math.min(config.max, Math.floor(config.max - currentValue));
+    if (maxOperand < config.min) {
       return null;
     }
 
-    for (let attempt = 0; attempt < 120; attempt += 1) {
-      const leftMax = Math.min(config.max, Math.floor(config.max / config.min));
-      const left = randomInt(config.min, leftMax);
-      const rightMax = Math.min(config.max, Math.floor(config.max / left));
+    return randomInt(config.min, maxOperand);
+  }
 
-      if (rightMax < config.min) {
+  if (operator === 'sub') {
+    const upperBound = config.allowNegativeSubtraction ? config.max : Math.min(config.max, Math.floor(currentValue));
+
+    if (upperBound < config.min) {
+      return null;
+    }
+
+    return randomInt(config.min, upperBound);
+  }
+
+  if (operator === 'mul') {
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      const candidate = randomInt(config.min, config.max);
+      const product = currentValue * candidate;
+
+      if (!Number.isFinite(product)) {
         continue;
       }
 
-      const right = randomInt(config.min, rightMax);
-      return { left, right, operator, answer: left * right };
+      if (product > config.max) {
+        continue;
+      }
+
+      if (!config.allowNegativeSubtraction && product < 0) {
+        continue;
+      }
+
+      return candidate;
     }
 
     return null;
@@ -296,32 +339,60 @@ function buildProblemSeed(operator: OperatorKey, config: GeneratorConfig): Probl
     return null;
   }
 
-  if (config.divisionIntegerOnly) {
-    for (let attempt = 0; attempt < 120; attempt += 1) {
-      const right = randomInt(minDivisor, config.max);
-      const minQuotient = Math.ceil(config.min / right);
-      const maxQuotient = Math.floor(config.max / right);
+  if (!config.divisionIntegerOnly) {
+    return randomInt(minDivisor, config.max);
+  }
 
-      if (minQuotient > maxQuotient) {
-        continue;
-      }
-
-      const quotient = randomInt(minQuotient, maxQuotient);
-      const left = right * quotient;
-
-      if (left < config.min || left > config.max) {
-        continue;
-      }
-
-      return { left, right, operator, answer: quotient };
-    }
-
+  if (!Number.isInteger(currentValue)) {
     return null;
   }
 
-  const left = randomInt(config.min, config.max);
-  const right = randomInt(minDivisor, config.max);
-  return { left, right, operator, answer: Number((left / right).toFixed(2)) };
+  const candidates: number[] = [];
+  for (let divisor = minDivisor; divisor <= config.max; divisor += 1) {
+    if (currentValue % divisor === 0) {
+      candidates.push(divisor);
+    }
+  }
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return candidates[randomInt(0, candidates.length - 1)];
+}
+
+function buildProblemSeed(operandCount: FixedOperandCount, enabledOperators: OperatorKey[], config: GeneratorConfig): ProblemSeed | null {
+  const operators = pickOperatorSequence(enabledOperators, operandCount - 1);
+  const operands: number[] = [randomInt(config.min, config.max)];
+  let currentValue = operands[0];
+
+  for (const operator of operators) {
+    const nextOperand = pickNextOperand(currentValue, operator, config);
+
+    if (nextOperand === null) {
+      return null;
+    }
+
+    const nextValue = applyOperator(currentValue, nextOperand, operator, config.divisionIntegerOnly);
+    if (nextValue === null || !Number.isFinite(nextValue)) {
+      return null;
+    }
+
+    if (!config.allowNegativeSubtraction && nextValue < 0) {
+      return null;
+    }
+
+    currentValue = nextValue;
+    operands.push(nextOperand);
+  }
+
+  const answer = Number.isInteger(currentValue) ? currentValue : Number(currentValue.toFixed(2));
+
+  return {
+    operands,
+    operators,
+    answer,
+  };
 }
 
 export function generateProblems(config: GeneratorConfig): GenerateProblemsResult {
@@ -337,21 +408,9 @@ export function generateProblems(config: GeneratorConfig): GenerateProblemsResul
     return { questions: [], error: '最小值不能大于最大值。' };
   }
 
-  if (config.columns < 1 || config.columns > 6) {
-    return { questions: [], error: '每行题目数量请设置在 1 到 6 之间。' };
-  }
-
   const enabledOperators = getEnabledOperators(config.operators);
   if (enabledOperators.length === 0) {
     return { questions: [], error: '请至少选择一个运算符。' };
-  }
-
-  if (enabledOperators.length === 1 && enabledOperators[0] === 'add' && config.min * 2 > config.max) {
-    return { questions: [], error: '当前最小值与最大值无法生成加法题，请调小最小值或调大最大值。' };
-  }
-
-  if (enabledOperators.length === 1 && enabledOperators[0] === 'mul' && config.min > 0 && config.min * config.min > config.max) {
-    return { questions: [], error: '当前最小值与最大值无法生成乘法题，请调小最小值或调大最大值。' };
   }
 
   if (enabledOperators.includes('div') && config.max < 1) {
@@ -363,9 +422,9 @@ export function generateProblems(config: GeneratorConfig): GenerateProblemsResul
   for (let index = 1; index <= config.count; index += 1) {
     let seed: ProblemSeed | null = null;
 
-    for (let attempt = 0; attempt < 200; attempt += 1) {
-      const operator = enabledOperators[randomInt(0, enabledOperators.length - 1)];
-      const candidate = buildProblemSeed(operator, config);
+    for (let attempt = 0; attempt < 320; attempt += 1) {
+      const operandCount = resolveOperandCount(config.operandCount);
+      const candidate = buildProblemSeed(operandCount, enabledOperators, config);
 
       if (candidate) {
         seed = candidate;
@@ -383,16 +442,23 @@ export function generateProblems(config: GeneratorConfig): GenerateProblemsResul
     questions.push({
       index,
       ...seed,
+      blankOperandIndex: config.showAnswerWithRandomBlankOperand ? randomInt(0, seed.operands.length - 1) : null,
     });
   }
 
   return { questions };
 }
 
-function buildTableRowsHtml(rows: Problem[][], columns: number, withAnswer = false): string {
+function buildTableRowsHtml(rows: Problem[][], columns: number, withAnswer: boolean): string {
   return rows
     .map((row) => {
-      const cells = row.map((question) => `<td>${escapeHtml(formatProblem(question, withAnswer))}</td>`);
+      const cells = row.map((question) => {
+        const display = formatProblem(question, withAnswer);
+        const indexPart = `${question.index}.`;
+        const contentPart = display.slice(indexPart.length).trimStart();
+
+        return `<td><span class="problem-index">${escapeHtml(indexPart)}</span> ${escapeHtml(contentPart)}</td>`;
+      });
       const missingCells = columns - row.length;
 
       for (let index = 0; index < missingCells; index += 1) {
@@ -407,8 +473,7 @@ function buildTableRowsHtml(rows: Problem[][], columns: number, withAnswer = fal
 export function buildWorksheetHtml(options: DocumentOptions): string {
   const safeTitle = escapeHtml(options.title);
   const rows = chunkArray(options.questions, options.columns);
-  const questionRows = buildTableRowsHtml(rows, options.columns, false);
-  const answerRows = buildTableRowsHtml(rows, options.columns, true);
+  const questionRows = buildTableRowsHtml(rows, options.columns, options.showAnswerWithRandomBlankOperand);
   const typography = getWorksheetTypography(options.columns);
 
   return `<!doctype html>
@@ -454,12 +519,10 @@ export function buildWorksheetHtml(options: DocumentOptions): string {
         vertical-align: top;
         white-space: nowrap;
       }
-      .answers {
-        page-break-before: always;
-      }
-      .section-title {
-        margin: 0 0 8px;
-        font-size: 18px;
+      .problem-index {
+        opacity: 0.6;
+        font-size: 0.84em;
+        font-weight: 500;
       }
       @media print {
         .no-print {
@@ -476,18 +539,6 @@ export function buildWorksheetHtml(options: DocumentOptions): string {
         ${questionRows}
       </tbody>
     </table>
-    ${
-      options.showAnswers
-        ? `<div class="answers">
-      <h2 class="section-title">答案</h2>
-      <table class="worksheet">
-        <tbody>
-          ${answerRows}
-        </tbody>
-      </table>
-    </div>`
-        : ''
-    }
   </body>
 </html>`;
 }

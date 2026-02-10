@@ -18,7 +18,7 @@ export function AppHeader({ colorTheme, colorThemeOptions, colorScheme, onThemeC
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold md:text-3xl">小学计算题生成器</h1>
-        <p className="text-muted-foreground text-sm">可配置运算符、数字范围，支持 PDF 预览、打印与 Word 导出。</p>
+        <p className="text-muted-foreground text-sm">可配置运算符、数字范围，支持 PDF 预览与打印导出。</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-sm">

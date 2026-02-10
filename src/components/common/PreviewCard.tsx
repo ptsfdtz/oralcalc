@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Problem, WorksheetTypography } from '@/types';
 
@@ -9,8 +11,7 @@ interface PreviewCardProps {
   previewRows: Problem[][];
   previewTypography: WorksheetTypography;
   columns: number;
-  showAnswersPreview: boolean;
-  formatProblem: (problem: Problem, withAnswer?: boolean) => string;
+  formatProblem: (problem: Problem) => ReactNode;
 }
 
 export function PreviewCard({
@@ -21,7 +22,6 @@ export function PreviewCard({
   previewRows,
   previewTypography,
   columns,
-  showAnswersPreview,
   formatProblem,
 }: PreviewCardProps) {
   return (
@@ -51,7 +51,7 @@ export function PreviewCard({
                           padding: `${previewTypography.paddingY}px ${previewTypography.paddingX}px`,
                         }}
                       >
-                        {formatProblem(problem, showAnswersPreview)}
+                        {formatProblem(problem)}
                       </td>
                     ))}
                     {Array.from({ length: Math.max(columns - row.length, 0) }).map((_, cellIndex) => (
@@ -73,4 +73,3 @@ export function PreviewCard({
     </Card>
   );
 }
-

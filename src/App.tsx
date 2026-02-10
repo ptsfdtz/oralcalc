@@ -8,9 +8,7 @@ import {
   COLOR_SCHEME_STORAGE_KEY,
   COLOR_THEME_OPTIONS,
   COLOR_THEME_STORAGE_KEY,
-  downloadBlob,
   formatProblem,
-  formatTimestampForFilename,
   generateProblems,
   GENERATOR_CONFIG_STORAGE_KEY,
   getEnabledOperators,
@@ -19,20 +17,27 @@ import {
   isColorScheme,
   isColorTheme,
   loadConfigFromStorage,
-  loadShowAnswersPreviewFromStorage,
   OPERATOR_OPTIONS,
   printHtmlWithIframe,
-  sanitizeFilename,
   setLocalStorageItem,
-  SHOW_ANSWERS_PREVIEW_STORAGE_KEY,
 } from '@/utils';
 import { Toaster, toast } from 'sonner';
+
+function formatProblemContent(problem: Problem, withAnswer: boolean, formatter: (problem: Problem, withAnswer?: boolean) => string) {
+  const display = formatter(problem, withAnswer);
+  const indexPart = `${problem.index}.`;
+  const content = display.startsWith(indexPart) ? display.slice(indexPart.length).trimStart() : display;
+
+  return {
+    indexPart,
+    content,
+  };
+}
 
 export function App() {
   const [config, setConfig] = React.useState<GeneratorConfig>(() => loadConfigFromStorage());
   const [questions, setQuestions] = React.useState<Problem[]>([]);
   const [error, setError] = React.useState<string>('');
-  const [showAnswersPreview, setShowAnswersPreview] = React.useState<boolean>(() => loadShowAnswersPreviewFromStorage());
   const [colorScheme, setColorScheme] = React.useState<ColorScheme>('light');
   const [colorTheme, setColorTheme] = React.useState<ColorTheme>('neutral');
   const [isPdfPreviewOpen, setIsPdfPreviewOpen] = React.useState<boolean>(false);
@@ -56,10 +61,6 @@ export function App() {
     setLocalStorageItem(GENERATOR_CONFIG_STORAGE_KEY, JSON.stringify(config));
   }, [config]);
 
-  React.useEffect(() => {
-    setLocalStorageItem(SHOW_ANSWERS_PREVIEW_STORAGE_KEY, JSON.stringify(showAnswersPreview));
-  }, [showAnswersPreview]);
-
   const reportError = React.useCallback((location: string, message: string) => {
     setError(`[${location}] ${message}`);
     toast.error(message, { description: `位置：${location}` });
@@ -69,8 +70,10 @@ export function App() {
     setError('');
   }, []);
 
-  const previewRows = React.useMemo(() => chunkArray(questions, config.columns), [questions, config.columns]);
-  const previewTypography = React.useMemo(() => getWorksheetTypography(config.columns), [config.columns]);
+  const worksheetColumns = 4;
+  const worksheetTitle = '小学计算题生成器';
+  const previewRows = React.useMemo(() => chunkArray(questions, worksheetColumns), [questions]);
+  const previewTypography = React.useMemo(() => getWorksheetTypography(worksheetColumns), []);
 
   const enabledOperatorKeys = React.useMemo(() => getEnabledOperators(config.operators), [config.operators]);
   const operatorSummary = React.useMemo(
@@ -101,7 +104,7 @@ export function App() {
     clearError();
   };
 
-  const handleNumberConfigChange = (field: 'count' | 'min' | 'max' | 'columns', value: string) => {
+  const handleNumberConfigChange = (field: 'count' | 'min' | 'max', value: string) => {
     const parsed = Number.parseInt(value, 10);
     setConfig((previous) => ({
       ...previous,
@@ -143,10 +146,10 @@ export function App() {
     const operatorText = operatorSummary.length > 0 ? operatorSummary : '未选择';
 
     return {
-      title: config.worksheetTitle.trim() || '小学口算练习',
+      title: worksheetTitle,
       questions,
-      columns: config.columns,
-      showAnswers: config.showAnswersInExport,
+      columns: worksheetColumns,
+      showAnswerWithRandomBlankOperand: config.showAnswerWithRandomBlankOperand,
       rangeText: `${config.min} ~ ${config.max}`,
       operatorText,
       generatedAt,
@@ -166,27 +169,6 @@ export function App() {
       clearError();
     } catch {
       reportError('PDF 预览', '生成预览失败，请重试。');
-    }
-  };
-
-  const handleExportWord = () => {
-    try {
-      if (questions.length === 0) {
-        reportError('Word 导出', '请先生成题目，再导出 Word。');
-        return;
-      }
-
-      const documentOptions = buildDocumentOptions();
-      const html = buildWorksheetHtml(documentOptions);
-      const now = new Date();
-      const fileName = `${sanitizeFilename(documentOptions.title)}-${formatTimestampForFilename(now)}.doc`;
-      const blob = new Blob(['\ufeff', html], { type: 'application/msword;charset=utf-8' });
-
-      downloadBlob(blob, fileName);
-      clearError();
-      toast.success('Word 导出成功', { description: `文件：${fileName}` });
-    } catch {
-      reportError('Word 导出', '导出失败，请检查浏览器下载权限。');
     }
   };
 
@@ -239,17 +221,22 @@ export function App() {
         <GeneratorConfigCard
           config={config}
           operatorOptions={OPERATOR_OPTIONS}
-          showAnswersPreview={showAnswersPreview}
           error={error}
           hasQuestions={questions.length > 0}
-          onTitleChange={(value) => {
+          onOperandCountChange={(value) => {
             setConfig((previous) => ({
               ...previous,
-              worksheetTitle: value,
+              operandCount: value,
             }));
           }}
           onNumberConfigChange={handleNumberConfigChange}
           onToggleOperator={handleToggleOperator}
+          onShowAnswerWithRandomBlankOperandChange={(checked) => {
+            setConfig((previous) => ({
+              ...previous,
+              showAnswerWithRandomBlankOperand: checked,
+            }));
+          }}
           onAllowNegativeSubtractionChange={(checked) => {
             setConfig((previous) => ({
               ...previous,
@@ -262,17 +249,9 @@ export function App() {
               divisionIntegerOnly: checked,
             }));
           }}
-          onShowAnswersInExportChange={(checked) => {
-            setConfig((previous) => ({
-              ...previous,
-              showAnswersInExport: checked,
-            }));
-          }}
-          onShowAnswersPreviewChange={setShowAnswersPreview}
           onGenerate={handleGenerate}
           onOpenPdfPreview={handleOpenPdfPreview}
           onPrintPdf={handlePrintPdf}
-          onExportWord={handleExportWord}
         />
 
         <PreviewCard
@@ -282,9 +261,16 @@ export function App() {
           questions={questions}
           previewRows={previewRows}
           previewTypography={previewTypography}
-          columns={config.columns}
-          showAnswersPreview={showAnswersPreview}
-          formatProblem={formatProblem}
+          columns={worksheetColumns}
+          formatProblem={(problem) => {
+            const parts = formatProblemContent(problem, config.showAnswerWithRandomBlankOperand, formatProblem);
+            return (
+              <>
+                <span className="text-muted-foreground mr-1 text-[0.84em] font-medium">{parts.indexPart}</span>
+                <span>{parts.content}</span>
+              </>
+            );
+          }}
         />
       </main>
 

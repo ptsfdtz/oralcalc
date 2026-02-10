@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "oralcalc",
+  "productName": "小学计算题生成器",
   "version": "0.1.0",
   "identifier": "ptsfdtz",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "oralcalc",
+        "title": "小学计算题生成器",
         "width": 1200,
         "height": 800
       }

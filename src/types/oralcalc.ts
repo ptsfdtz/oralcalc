@@ -35,30 +35,30 @@ export interface OperatorOption {
 
 export type OperatorState = Record<OperatorKey, boolean>;
 
+export type OperandCount = 2 | 3 | 'mixed';
+
 export interface GeneratorConfig {
-  worksheetTitle: string;
   count: number;
   min: number;
   max: number;
-  columns: number;
+  operandCount: OperandCount;
+  showAnswerWithRandomBlankOperand: boolean;
   allowNegativeSubtraction: boolean;
   divisionIntegerOnly: boolean;
-  showAnswersInExport: boolean;
   operators: OperatorState;
 }
 
 export interface Problem {
   index: number;
-  left: number;
-  right: number;
-  operator: OperatorKey;
+  operands: number[];
+  operators: OperatorKey[];
   answer: number;
+  blankOperandIndex: number | null;
 }
 
 export interface ProblemSeed {
-  left: number;
-  right: number;
-  operator: OperatorKey;
+  operands: number[];
+  operators: OperatorKey[];
   answer: number;
 }
 
@@ -66,7 +66,7 @@ export interface DocumentOptions {
   title: string;
   questions: Problem[];
   columns: number;
-  showAnswers: boolean;
+  showAnswerWithRandomBlankOperand: boolean;
   rangeText: string;
   operatorText: string;
   generatedAt: string;
@@ -83,4 +83,3 @@ export interface GenerateProblemsResult {
   questions: Problem[];
   error?: string;
 }
-
