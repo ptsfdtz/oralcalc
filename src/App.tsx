@@ -70,6 +70,13 @@ export function App() {
     setError('');
   }, []);
 
+  const remapBlankOperand = React.useCallback((source: Problem[], enabled: boolean): Problem[] => {
+    return source.map((problem) => ({
+      ...problem,
+      blankOperandIndex: enabled ? Math.floor(Math.random() * problem.operands.length) : null,
+    }));
+  }, []);
+
   const worksheetColumns = 4;
   const worksheetTitle = '小学计算题生成器';
   const previewRows = React.useMemo(() => chunkArray(questions, worksheetColumns), [questions]);
@@ -236,6 +243,7 @@ export function App() {
               ...previous,
               showAnswerWithRandomBlankOperand: checked,
             }));
+            setQuestions((previous) => remapBlankOperand(previous, checked));
           }}
           onAllowNegativeSubtractionChange={(checked) => {
             setConfig((previous) => ({
