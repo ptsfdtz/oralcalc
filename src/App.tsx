@@ -4,10 +4,36 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { FiMoon, FiSun } from 'react-icons/fi';
+import { Toaster, toast } from 'sonner';
 
 const COLOR_SCHEME_STORAGE_KEY = 'oralcalc-color-scheme';
+const COLOR_THEME_STORAGE_KEY = 'oralcalc-color-theme';
+
+const COLOR_THEME_OPTIONS = [
+  { key: 'neutral', label: '中性灰' },
+  { key: 'amber', label: '琥珀' },
+  { key: 'blue', label: '蓝色' },
+  { key: 'cyan', label: '青色' },
+  { key: 'emerald', label: '翠绿' },
+  { key: 'fuchsia', label: '洋红' },
+  { key: 'green', label: '绿色' },
+  { key: 'indigo', label: '靛蓝' },
+  { key: 'lime', label: '黄绿' },
+  { key: 'orange', label: '橙色' },
+  { key: 'pink', label: '粉色' },
+  { key: 'purple', label: '紫色' },
+  { key: 'red', label: '红色' },
+  { key: 'rose', label: '玫红' },
+  { key: 'sky', label: '天空蓝' },
+  { key: 'teal', label: '蓝绿' },
+  { key: 'violet', label: '紫罗兰' },
+  { key: 'yellow', label: '黄色' },
+] as const;
+
+type ColorTheme = (typeof COLOR_THEME_OPTIONS)[number]['key'];
 
 const OPERATOR_OPTIONS = [
   { key: 'add', label: '加法', symbol: '+' },
@@ -97,6 +123,10 @@ function getEnabledOperators(operators: OperatorState): OperatorKey[] {
   return OPERATOR_OPTIONS.filter((option) => operators[option.key]).map((option) => option.key);
 }
 
+function isColorTheme(value: string): value is ColorTheme {
+  return COLOR_THEME_OPTIONS.some((option) => option.key === value);
+}
+
 function formatAnswer(value: number): string {
   if (Number.isInteger(value)) {
     return String(value);
@@ -111,15 +141,48 @@ function formatProblem(problem: Problem, withAnswer = false): string {
   return `${problem.index}. ${problem.left} ${symbol} ${problem.right} = ${result}`;
 }
 
+function getWorksheetTypography(columns: number): {
+  fontSize: number;
+  lineHeight: number;
+  paddingY: number;
+  paddingX: number;
+} {
+  const normalized = Math.min(6, Math.max(1, columns));
+
+  if (normalized <= 2) {
+    return { fontSize: 17, lineHeight: 1.7, paddingY: 8, paddingX: 6 };
+  }
+
+  if (normalized === 3) {
+    return { fontSize: 16, lineHeight: 1.6, paddingY: 7, paddingX: 5 };
+  }
+
+  if (normalized === 4) {
+    return { fontSize: 15, lineHeight: 1.5, paddingY: 6, paddingX: 5 };
+  }
+
+  if (normalized === 5) {
+    return { fontSize: 14, lineHeight: 1.45, paddingY: 5, paddingX: 4 };
+  }
+
+  return { fontSize: 13, lineHeight: 1.35, paddingY: 4, paddingX: 3 };
+}
+
 function buildProblemSeed(operator: OperatorKey, config: GeneratorConfig): ProblemSeed | null {
   if (config.min > config.max) {
     return null;
   }
 
   if (operator === 'add') {
-    const left = randomInt(config.min, config.max);
-    const right = randomInt(config.min, config.max);
-    return { left, right, operator, answer: left + right };
+    const minSum = config.min * 2;
+    if (minSum > config.max) {
+      return null;
+    }
+
+    const answer = randomInt(minSum, config.max);
+    const left = randomInt(config.min, answer - config.min);
+    const right = answer - left;
+    return { left, right, operator, answer };
   }
 
   if (operator === 'sub') {
@@ -134,9 +197,31 @@ function buildProblemSeed(operator: OperatorKey, config: GeneratorConfig): Probl
   }
 
   if (operator === 'mul') {
-    const left = randomInt(config.min, config.max);
-    const right = randomInt(config.min, config.max);
-    return { left, right, operator, answer: left * right };
+    if (config.min === 0) {
+      const left = randomInt(config.min, config.max);
+      const rightMax = left === 0 ? config.max : Math.floor(config.max / left);
+      const right = randomInt(config.min, Math.min(config.max, rightMax));
+      return { left, right, operator, answer: left * right };
+    }
+
+    if (config.min * config.min > config.max) {
+      return null;
+    }
+
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      const leftMax = Math.min(config.max, Math.floor(config.max / config.min));
+      const left = randomInt(config.min, leftMax);
+      const rightMax = Math.min(config.max, Math.floor(config.max / left));
+
+      if (rightMax < config.min) {
+        continue;
+      }
+
+      const right = randomInt(config.min, rightMax);
+      return { left, right, operator, answer: left * right };
+    }
+
+    return null;
   }
 
   const minDivisor = Math.max(config.min, 1);
@@ -194,6 +279,14 @@ function generateProblems(config: GeneratorConfig): { questions: Problem[]; erro
     return { questions: [], error: '请至少选择一个运算符。' };
   }
 
+  if (enabledOperators.length === 1 && enabledOperators[0] === 'add' && config.min * 2 > config.max) {
+    return { questions: [], error: '当前最小值与最大值无法生成加法题，请调小最小值或调大最大值。' };
+  }
+
+  if (enabledOperators.length === 1 && enabledOperators[0] === 'mul' && config.min > 0 && config.min * config.min > config.max) {
+    return { questions: [], error: '当前最小值与最大值无法生成乘法题，请调小最小值或调大最大值。' };
+  }
+
   if (enabledOperators.includes('div') && config.max < 1) {
     return { questions: [], error: '启用除法时，最大值至少需要为 1。' };
   }
@@ -249,6 +342,7 @@ function buildWorksheetHtml(options: DocumentOptions): string {
   const rows = chunkArray(options.questions, options.columns);
   const questionRows = buildTableRowsHtml(rows, options.columns, false);
   const answerRows = buildTableRowsHtml(rows, options.columns, true);
+  const typography = getWorksheetTypography(options.columns);
 
   return `<!doctype html>
 <html lang="zh-CN">
@@ -286,11 +380,12 @@ function buildWorksheetHtml(options: DocumentOptions): string {
       }
       .worksheet td {
         width: ${100 / options.columns}%;
-        padding: 8px 6px;
+        padding: ${typography.paddingY}px ${typography.paddingX}px;
         border: 1px solid #e5e7eb;
-        font-size: 18px;
-        line-height: 1.8;
+        font-size: ${typography.fontSize}px;
+        line-height: ${typography.lineHeight};
         vertical-align: top;
+        white-space: nowrap;
       }
       .answers {
         page-break-before: always;
@@ -354,22 +449,77 @@ function downloadBlob(blob: Blob, filename: string): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function printHtmlWithIframe(html: string): void {
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.style.opacity = '0';
+  iframe.setAttribute('aria-hidden', 'true');
+  document.body.append(iframe);
+
+  const frameWindow = iframe.contentWindow;
+  const frameDocument = frameWindow?.document;
+
+  if (!frameWindow || !frameDocument) {
+    iframe.remove();
+    throw new Error('iframe-print-unavailable');
+  }
+
+  frameDocument.open();
+  frameDocument.write(html);
+  frameDocument.close();
+
+  frameWindow.addEventListener(
+    'load',
+    () => {
+      window.setTimeout(() => {
+        frameWindow.focus();
+        frameWindow.print();
+
+        window.setTimeout(() => {
+          iframe.remove();
+        }, 2000);
+      }, 120);
+    },
+    { once: true },
+  );
+}
+
 export function App() {
   const [config, setConfig] = React.useState<GeneratorConfig>(INITIAL_CONFIG);
   const [questions, setQuestions] = React.useState<Problem[]>([]);
   const [error, setError] = React.useState<string>('');
   const [showAnswersPreview, setShowAnswersPreview] = React.useState<boolean>(false);
   const [colorScheme, setColorScheme] = React.useState<'light' | 'dark'>('light');
+  const [colorTheme, setColorTheme] = React.useState<ColorTheme>('neutral');
+  const [isPdfPreviewOpen, setIsPdfPreviewOpen] = React.useState<boolean>(false);
+  const [pdfPreviewHtml, setPdfPreviewHtml] = React.useState<string>('');
 
   React.useEffect(() => {
     const storedScheme = localStorage.getItem(COLOR_SCHEME_STORAGE_KEY) as 'light' | 'dark' | null;
+    const storedTheme = localStorage.getItem(COLOR_THEME_STORAGE_KEY);
     const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
     const initialScheme = storedScheme ?? (prefersDark ? 'dark' : 'light');
+    const initialTheme = storedTheme && isColorTheme(storedTheme) ? storedTheme : 'neutral';
     setColorScheme(initialScheme);
+    setColorTheme(initialTheme);
     document.documentElement.classList.toggle('dark', initialScheme === 'dark');
+    document.documentElement.setAttribute('data-theme', initialTheme);
+  }, []);
+
+  const reportError = React.useCallback((location: string, message: string) => {
+    setError(`[${location}] ${message}`);
+    toast.error(message, { description: `位置：${location}` });
+  }, []);
+
+  const clearError = React.useCallback(() => {
+    setError('');
   }, []);
 
   const previewRows = React.useMemo(() => chunkArray(questions, config.columns), [questions, config.columns]);
+  const previewTypography = React.useMemo(() => getWorksheetTypography(config.columns), [config.columns]);
 
   const enabledOperatorKeys = React.useMemo(() => getEnabledOperators(config.operators), [config.operators]);
   const operatorSummary = enabledOperatorKeys
@@ -382,7 +532,7 @@ export function App() {
   const handleToggleOperator = (operator: OperatorKey) => {
     const enabledCount = getEnabledOperators(config.operators).length;
     if (config.operators[operator] && enabledCount === 1) {
-      setError('至少保留一个运算符。');
+      reportError('运算符设置', '至少保留一个运算符。');
       return;
     }
 
@@ -393,7 +543,7 @@ export function App() {
         [operator]: !previous.operators[operator],
       },
     }));
-    setError('');
+    clearError();
   };
 
   const handleNumberConfigChange = (field: 'count' | 'min' | 'max' | 'columns', value: string) => {
@@ -404,16 +554,42 @@ export function App() {
     }));
   };
 
+  const handleThemeChange = (value: string) => {
+    if (!isColorTheme(value)) {
+      return;
+    }
+
+    setColorTheme(value);
+    localStorage.setItem(COLOR_THEME_STORAGE_KEY, value);
+    document.documentElement.setAttribute('data-theme', value);
+  };
+
   const handleGenerate = () => {
     const result = generateProblems(config);
     if (result.error) {
       setQuestions([]);
-      setError(result.error);
+      reportError('题目配置', result.error);
       return;
     }
 
     setQuestions(result.questions);
-    setError('');
+    clearError();
+  };
+
+  const handleOpenPdfPreview = () => {
+    try {
+      if (questions.length === 0) {
+        reportError('PDF 预览', '请先生成题目，再预览 PDF。');
+        return;
+      }
+
+      const html = buildWorksheetHtml(buildDocumentOptions());
+      setPdfPreviewHtml(html);
+      setIsPdfPreviewOpen(true);
+      clearError();
+    } catch {
+      reportError('PDF 预览', '生成预览失败，请重试。');
+    }
   };
 
   const buildDocumentOptions = (): DocumentOptions => {
@@ -431,47 +607,59 @@ export function App() {
   };
 
   const handleExportWord = () => {
-    if (questions.length === 0) {
-      setError('请先生成题目，再导出 Word。');
-      return;
+    try {
+      if (questions.length === 0) {
+        reportError('Word 导出', '请先生成题目，再导出 Word。');
+        return;
+      }
+
+      const documentOptions = buildDocumentOptions();
+      const html = buildWorksheetHtml(documentOptions);
+      const now = new Date();
+      const fileName = `${sanitizeFilename(documentOptions.title)}-${formatTimestampForFilename(now)}.doc`;
+      const blob = new Blob(['\ufeff', html], { type: 'application/msword;charset=utf-8' });
+
+      downloadBlob(blob, fileName);
+      clearError();
+      toast.success('Word 导出成功', { description: `文件：${fileName}` });
+    } catch {
+      reportError('Word 导出', '导出失败，请检查浏览器下载权限。');
     }
-
-    const documentOptions = buildDocumentOptions();
-    const html = buildWorksheetHtml(documentOptions);
-    const now = new Date();
-    const fileName = `${sanitizeFilename(documentOptions.title)}-${formatTimestampForFilename(now)}.doc`;
-    const blob = new Blob(['\ufeff', html], { type: 'application/msword;charset=utf-8' });
-
-    downloadBlob(blob, fileName);
-    setError('');
   };
 
   const handlePrintPdf = () => {
-    if (questions.length === 0) {
-      setError('请先生成题目，再打印或导出 PDF。');
-      return;
+    try {
+      if (questions.length === 0) {
+        reportError('PDF 导出', '请先生成题目，再打印或导出 PDF。');
+        return;
+      }
+
+      const documentOptions = buildDocumentOptions();
+      const html = buildWorksheetHtml(documentOptions);
+      const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1000,height=800');
+
+      if (!printWindow) {
+        printHtmlWithIframe(html);
+        clearError();
+        toast.success('已调用系统打印', { description: '请在打印对话框中选择“另存为 PDF”。' });
+        return;
+      }
+
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
+
+      const triggerPrint = () => {
+        printWindow.focus();
+        printWindow.print();
+      };
+
+      printWindow.addEventListener('load', () => window.setTimeout(triggerPrint, 150), { once: true });
+      clearError();
+      toast.success('已打开打印窗口', { description: '请在系统打印对话框中选择“另存为 PDF”。' });
+    } catch {
+      reportError('PDF 导出', '打开打印窗口失败，请重试。');
     }
-
-    const documentOptions = buildDocumentOptions();
-    const html = buildWorksheetHtml(documentOptions);
-    const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1000,height=800');
-
-    if (!printWindow) {
-      setError('弹窗被阻止，请允许弹窗后重试打印。');
-      return;
-    }
-
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
-
-    const triggerPrint = () => {
-      printWindow.focus();
-      printWindow.print();
-    };
-
-    printWindow.addEventListener('load', () => window.setTimeout(triggerPrint, 150), { once: true });
-    setError('');
   };
 
   return (
@@ -480,28 +668,50 @@ export function App() {
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold md:text-3xl">小学计算题生成器</h1>
-            <p className="text-muted-foreground text-sm">可配置运算符、数字范围，支持打印与 Word 导出。</p>
+            <p className="text-muted-foreground text-sm">可配置运算符、数字范围，支持 PDF 预览、打印与 Word 导出。</p>
           </div>
-          <div className="flex items-center gap-2 text-sm">
-            <FiSun className={colorScheme === 'light' ? 'text-foreground' : 'text-muted-foreground'} />
-            <Switch
-              aria-label="切换明暗模式"
-              checked={colorScheme === 'dark'}
-              onCheckedChange={(checked) => {
-                const nextScheme = checked ? 'dark' : 'light';
-                setColorScheme(nextScheme);
-                localStorage.setItem(COLOR_SCHEME_STORAGE_KEY, nextScheme);
-                document.documentElement.classList.toggle('dark', nextScheme === 'dark');
-              }}
-            />
-            <FiMoon className={colorScheme === 'dark' ? 'text-foreground' : 'text-muted-foreground'} />
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="theme-color-select" className="text-muted-foreground text-xs">
+                主题色
+              </Label>
+              <Select value={colorTheme} onValueChange={handleThemeChange}>
+                <SelectTrigger id="theme-color-select" className="w-36" size="sm" aria-label="切换主题颜色">
+                  <SelectValue placeholder="选择主题色" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {COLOR_THEME_OPTIONS.map((option) => (
+                      <SelectItem key={option.key} value={option.key}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <FiSun className={colorScheme === 'light' ? 'text-foreground' : 'text-muted-foreground'} />
+              <Switch
+                aria-label="切换明暗模式"
+                checked={colorScheme === 'dark'}
+                onCheckedChange={(checked) => {
+                  const nextScheme = checked ? 'dark' : 'light';
+                  setColorScheme(nextScheme);
+                  localStorage.setItem(COLOR_SCHEME_STORAGE_KEY, nextScheme);
+                  document.documentElement.classList.toggle('dark', nextScheme === 'dark');
+                }}
+              />
+              <FiMoon className={colorScheme === 'dark' ? 'text-foreground' : 'text-muted-foreground'} />
+            </div>
           </div>
         </header>
 
         <Card>
           <CardHeader>
             <CardTitle>题目配置</CardTitle>
-            <CardDescription>先设置参数，再点击「生成题目」。</CardDescription>
+            <CardDescription>先设置参数，再点击「生成题目」（加乘结果不超过最大值，减除左侧数不超过最大值）。</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -643,6 +853,9 @@ export function App() {
               <Button type="button" onClick={handleGenerate}>
                 生成题目
               </Button>
+              <Button type="button" variant="outline" onClick={handleOpenPdfPreview} disabled={questions.length === 0}>
+                PDF 预览
+              </Button>
               <Button type="button" variant="outline" onClick={handlePrintPdf} disabled={questions.length === 0}>
                 打印 / 导出 PDF
               </Button>
@@ -670,12 +883,26 @@ export function App() {
                     {previewRows.map((row, rowIndex) => (
                       <tr key={`row-${rowIndex}`} className="[&:not(:last-child)>td]:border-b">
                         {row.map((problem) => (
-                          <td key={problem.index} className="border-border p-3 align-top text-base leading-8 not-last:border-r">
+                          <td
+                            key={problem.index}
+                            className="border-border align-top whitespace-nowrap not-last:border-r"
+                            style={{
+                              fontSize: `${previewTypography.fontSize}px`,
+                              lineHeight: previewTypography.lineHeight,
+                              padding: `${previewTypography.paddingY}px ${previewTypography.paddingX}px`,
+                            }}
+                          >
                             {formatProblem(problem, showAnswersPreview)}
                           </td>
                         ))}
                         {Array.from({ length: Math.max(config.columns - row.length, 0) }).map((_, cellIndex) => (
-                          <td key={`empty-${rowIndex}-${cellIndex}`} className="border-border p-3 not-last:border-r" />
+                          <td
+                            key={`empty-${rowIndex}-${cellIndex}`}
+                            className="border-border not-last:border-r"
+                            style={{
+                              padding: `${previewTypography.paddingY}px ${previewTypography.paddingX}px`,
+                            }}
+                          />
                         ))}
                       </tr>
                     ))}
@@ -686,6 +913,37 @@ export function App() {
           </CardContent>
         </Card>
       </main>
+
+      {isPdfPreviewOpen ? (
+        <div className="bg-black/55 fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="bg-background border-border flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border shadow-2xl">
+            <div className="border-border flex items-center justify-between border-b px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold">PDF 预览</p>
+                <p className="text-muted-foreground text-xs">确认无误后点击「导出 PDF」。</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    handlePrintPdf();
+                  }}
+                >
+                  导出 PDF
+                </Button>
+                <Button type="button" onClick={() => setIsPdfPreviewOpen(false)}>
+                  关闭
+                </Button>
+              </div>
+            </div>
+
+            <iframe title="PDF 预览" srcDoc={pdfPreviewHtml} className="h-full w-full bg-white" />
+          </div>
+        </div>
+      ) : null}
+
+      <Toaster richColors position="top-right" theme={colorScheme === 'dark' ? 'dark' : 'light'} />
     </div>
   );
 }
